@@ -19,8 +19,7 @@ if not os.path.exists('insurance.csv'):
     st.error("HATA: 'insurance.csv' dosyası bulunamadı! Lütfen dosyayı app.py yanına koy.")
     st.stop()
 
-dosya_yolu = r"C:\Users\Fatih\Downloads\insurance.csv"
-df = pd.read_csv(dosya_yolu)
+df = pd.read.csv("insurance")
 # --- 2. ÖN İŞLEME VE MODEL ---
 # Veriyi sayısal hale getir
 df['sex_encoded'] = df['sex'].map({'female': 0, 'male': 1})
@@ -81,4 +80,5 @@ with col2:
     st.write("BMI ve Maliyet İlişkisi")
     fig2, ax2 = plt.subplots()
     sns.scatterplot(data=df, x='bmi', y='charges', hue='smoker', ax=ax2)
+
     st.pyplot(fig2)
