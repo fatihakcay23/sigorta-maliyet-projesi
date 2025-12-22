@@ -19,7 +19,7 @@ if not os.path.exists('insurance.csv'):
     st.error("HATA: 'insurance.csv' dosyası bulunamadı! Lütfen dosyayı app.py yanına koy.")
     st.stop()
 
-df = pd.read.csv("insurance")
+df = pd.read_csv("insurance.csv")
 # --- 2. ÖN İŞLEME VE MODEL ---
 # Veriyi sayısal hale getir
 df['sex_encoded'] = df['sex'].map({'female': 0, 'male': 1})
@@ -82,3 +82,4 @@ with col2:
     sns.scatterplot(data=df, x='bmi', y='charges', hue='smoker', ax=ax2)
 
     st.pyplot(fig2)
+
