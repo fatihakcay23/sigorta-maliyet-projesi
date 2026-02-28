@@ -1,0 +1,360 @@
+---
+title: "Sigorta Maliyet ve Regresyon Analizi"
+author: "Fatih Akçay, Defne Nur Teber, Hüseyin Kerim Aksu, Bahar Aldemir"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# 1. Kütüphanelerin Yüklenmesi
+
+```{r libraries}
+# Analiz için gerekli olan kütüphaneler yükleniyor.
+
+library(tidyverse)
+# tidyverse paketi veri manipülasyonu ve okuma işlemleri için yükleniyor. 
+
+library(ggplot2)
+# ggplot2 paketi görselleştirme işlemleri için yükleniyor. 
+
+library(corrplot)
+# corrplot paketi korelasyon matrislerini görselleştirmek için kullanılır.
+
+library(caTools)
+# caTools paketi veri setini train ve test olarak bölmek için kullanılır.
+
+library(car)
+# car paketi VIF (Variance Inflation Factor) testini hesaplamak için gereklidir. Çoklu bağıntı problemini tespit etmeye yarar.
+
+library(lmtest)
+# lmtest paketi Breusch-Pagan ve Durbin-Watson gibi istatistiksel testleri yapmak için kullanılır.
+
+library(fastDummies)
+# fastDummies paketi one-hot encoding işlemi için aktif hale getiriliyor.
+```
+
+# 2. Veri Yükleme ve Genel Bakış
+
+```{r load-data}
+
+# Kullanıcıdan bir CSV dosyası seçmesi isteniyor ve bu dosya df isimli bir veri çerçevesine yükleniyor.
+# Not: Dosya yolu bilgisayarınıza özeldir, gerekirse güncelleyiniz.
+data <- read.csv("C:/Users/Fatih/Downloads/insurance.csv")
+dfr <- data
+
+
+cat("Veri Seti Boyutu:", dim(dfr), "\n")
+# Veri setinin boyutu yani satır ve sütun sayısı ekrana yazdırılıyor.
+# Çıktıya göre veri seti toplamda (satır sayısı) gözlem ve (sütun sayısı) değişkenden oluşmaktadır.
+# Bu büyüklük, çoklu doğrusal regresyon analizi için yeterli gözlem sayısına sahip olunduğunu göstermektedir.
+
+print(head(dfr))
+# Veri setinin ilk 6 satırı ekrana yazdırılarak veriye genel bir bakış sağlanıyor.
+# İlk 6 gözlem incelendiğinde değişkenlerin veri tipleri ve genel dağılımları hakkında ön bilgi edinilmektedir.
+# charges değişkeninin sayısal ve geniş aralıklı olduğu, diğer değişkenlerin ise beklenen formatta olduğu görülmektedir.
+```
+
+# 3. Eksik Veri ve Aykırı Değer Analizi
+
+```{r eda}
+cat("\n--- Eksik Veri Sayıları ---\n")
+
+print(colSums(is.na(dfr)))
+# Her sütundaki eksik veri sayısı hesaplanıp ekrana yazdırılıyor.
+# Çıktıya göre veri setinde eksik gözlem bulunmamaktadır (tüm değişkenler için NA sayısı 0'dır).
+# Bu durum, modelleme öncesinde eksik veri temizleme veya imputasyon işlemine gerek olmadığını göstermektedir.
+
+numeric_cols <- c("age", "bmi", "children", "charges")
+# Sayısal değişkenlerin isimleri bir vektörde toplanıyor. Bu değişkenler üzerinde aykırı değer analizi yapılacak.
+
+cat("\n--- Aykırı Değer Analizi (IQR) ---\n")
+
+for(col in numeric_cols) {
+  # Sayısal her sütun için döngü başlatılıyor.
+  
+  Q1 <- quantile(dfr[[col]], 0.25)
+  # Birinci çeyrek değeri yani %25'lik dilim hesaplanıyor.
+  
+  Q3 <- quantile(dfr[[col]], 0.75)
+  # Üçüncü çeyrek değeri yani %75'lik dilim hesaplanıyor.
+  
+  IQR <- Q3 - Q1
+  # Çeyrekler arası açıklık IQR hesaplanıyor. Bu değer aykırı değer tespitinde kullanılır.
+  
+  lower <- Q1 - 1.5 * IQR
+  # Alt sınır hesaplanıyor. Bu sınırın altındaki değerler aykırı kabul edilir.
+  
+  upper <- Q3 + 1.5 * IQR
+  # Üst sınır hesaplanıyor. Bu sınırın üstündeki değerler aykırı kabul edilir.
+  
+  outliers <- dfr[[col]][dfr[[col]] < lower | dfr[[col]] > upper]
+  # Alt veya üst sınırın dışında kalan değerler outliers vektörüne atanıyor.
+  
+  cat(col, ":", length(outliers), "adet aykırı değer bulundu.\n")
+  # Her değişken için bulunan aykırı değer sayısı ekrana yazdırılıyor.
+  # IQR yöntemine göre her bir sayısal değişkende aykırı değer sayısı ayrı ayrı raporlanmıştır.
+  # Özellikle charges değişkeninde bulunan aykırı değer sayısının diğer değişkenlere kıyasla daha fazla olması beklenen bir durumdur.
+  # Bunun nedeni sigorta maliyetlerinin bazı bireylerde çok yüksek değerlere ulaşabilmesidir.
+  # Bu aykırı değerler model sonuçlarını etkileyebileceği için, sonraki aşamalarda tanı testleri ve grafikler ile birlikte değerlendirilecektir.
+  
+  outlier_indices <- c()
+  
+  outlier_indices <- c(outlier_indices, which(dfr[[col]] < lower | dfr[[col]] > upper))
+  # Sınırların dışındaki satır numaralarını listeye ekle
+ 
+  outlier_indices <- unique(outlier_indices)
+  # Aynı satırı birden fazla kez yazmamak için tekilleştiriyoruz
+  
+  df <- dfr[-outlier_indices, ]
+  
+}
+```
+
+# 4. Veri Ön İşleme (Encoding)
+
+```{r preprocessing}
+df$sex    <- as.factor(df$sex)
+# sex değişkeni faktör tipine dönüştürülüyor. Bu kategorik değişkenlerin modelde doğru işlenmesini sağlar.
+# Bu dönüşüm sonrasında model çıktısında sex ile ilgili katsayı, referans cinsiyete göre maliyet farkı şeklinde yorumlanacaktır.
+
+df$smoker <- as.factor(df$smoker)
+# smoker değişkeni faktör tipine dönüştürülüyor.
+# Bu dönüşüm sonrasında model çıktısında smoker ile ilgili katsayı, referans gruba göre (genellikle "no") maliyet farkı şeklinde yorumlanacaktır.
+
+df$region <- as.factor(df$region)
+# region değişkeni faktör tipine dönüştürülüyor.
+# Bu dönüşüm sonrasında model çıktısında region katsayıları, referans bölgeye göre maliyet farkları şeklinde yorumlanacaktır.
+```
+
+# 5. Görselleştirme ve Korelasyon
+
+```{r visualization}
+print(
+  ggplot(df, aes(x = smoker, y = charges, fill = smoker)) +
+    geom_boxplot() +
+    theme_minimal() +
+    labs(title = "Sigara Kullanımına Göre Maliyet Dağılımı")
+)
+# Sigara kullanan ve kullanmayan kişilerin sigorta maliyetlerinin dağılımı kutu grafiği ile görselleştiriliyor.
+# Kutu grafiği incelendiğinde sigara içen bireylerin medyan sigorta maliyetinin,
+# sigara içmeyen bireylere kıyasla oldukça yüksek olduğu açıkça görülmektedir.
+# Ayrıca sigara içen grupta maliyet dağılımının daha geniş olduğu ve üst uçta çok sayıda yüksek maliyetli gözlem bulunduğu dikkat çekmektedir.
+# Bu bulgu, sigara kullanımının maliyet seviyesini belirgin biçimde artırdığını ve maliyetlerdeki değişkenliği de yükselttiğini göstermektedir.
+
+
+num_cols <- c("age","bmi","children","charges")
+cor_mat <- cor(df[, num_cols])
+cat("\n--- Sayısal Korelasyon Matrisi ---\n")
+print(cor_mat)
+corrplot(cor_mat, method="color", type="upper", addCoef.col="black", tl.col="black")
+# Korelasyon matrisi renkli bir ısı haritası şeklinde görselleştiriliyor. Sadece üst üçgen gösteriliyor ve korelasyon katsayıları siyah yazı ile ekleniyor.
+# Charges ile age ve bmi değişkenleri arasında pozitif yönlü.
+# Children değişkenlerinin charges ile olan korelasyonlarının ise oldukça düşük olduğu görülmektedir.
+# Bu durum, bu değişkenlerin tek başına maliyetleri açıklama gücünün sınırlı olabileceğini düşündürmektedir.
+
+cat("\n--- charges ~ sex (t-test) ---\n")
+print(t.test(charges ~ sex, data=df))
+# p-value (0.3998) > 0.05 olduğu için istatistiksel olarak anlamlı bir fark yokturtur.
+#Kadınların ortalaması (10,100) ile Erkeklerin ortalaması (9,747) birbirine çok yakındır.
+#Ayırt edici bir özellik değildir.
+
+cat("\n--- charges ~ smoker (t-test) ---\n")
+print(t.test(charges ~ smoker, data=df))
+# p-value neredeyse 0'dır .Sigara içmeyenlerin ortalaması neredeyse ~8,355 birim iken, 
+#içenlerin ortalaması ~22,014 birimdir.Bu verideki en belirleyici faktör sigaradır.
+# Sigara içen bir müşterinin masrafı, içmeyene göre ortalama 2.5 - 3 kat daha fazladır.
+
+cat("\n--- charges ~ region (ANOVA) ---\n")
+print(summary(aov(charges ~ region, data=df)))
+# p-value (0.0177) < 0.05 olduğu için bölgeler arasında anlamlı bir fark vardır.
+# Müşterinin yaşadığı yer fiyatlandırmayı etkiliyor.
+```
+
+# 6. Veri Setini Bölme (Train/Test Split)
+
+```{r split-data}
+set.seed(145)
+# Kodumuzu her çalıştırdığımızda aynı değerlerle çalışmak adına belli bir veri alanı sabitlemek için set.seed kullandık.
+
+sampleindx <- sample(1:nrow(df), size = 0.80 * nrow(df))
+
+trainset <- df[sampleindx, ]
+testset  <- df[-sampleindx, ]
+
+# Modeli değerlendirmek adına ikiye böldük.
+# Verinin %80'ini modelin ilişkileri öğrenmesi için trainset olarak aldık.
+# Verinin geri kalanını yani %20'sini ise testset olarak modelden çıkardık, bu verileri modeli test etmek için kullandık.
+# Bu bölmedeki amacımız overfitting engellemek ve modelin performansını görmektir
+
+cat("Train Set Boyutu:", nrow(trainset), "\n")
+cat("Test Set Boyutu :", nrow(testset), "\n")
+
+# Ayrıştırmanın matematiksel olarak doğru olduğundan ve verilerin eksilmediğinden emin olmak için boyut kontrolleri yaptık.
+# Çıktıda da görüldüğü üzere, veri setimiz beklenen oranlarda ayrıştırıldı.
+```
+
+# 7. Modelleme
+
+```{r modeling}
+model1 <- lm(charges ~ age + bmi + children + sex + smoker + region, data = trainset)
+
+# Lineer regresyon modeli oluşturduk. Charges bağımlı değişken, diğerleri bağımsız değişkenler olarak kullanılıyor.
+# Bu modelde yaş, cinsiyet, sigara içilmesi, çocuk sahibi olunması, vücut kütle indeksi 
+# ve bölgeye göre sigorta fiyatlandırmasının nasıl değiştiğini modelliyoruz.
+
+print(summary(model1))
+# Modelin özetini bize gösterir. Bu özetteki değerlendirmeler ile hangi değişkenimizin kalacağını hangisinin çıkacağını kontrol ederiz.
+
+# ESTIMATE
+# Estimate sütununda değişkenlerin harcamalar üzerindeki net etkisini gösterir.
+# (Intercept): Tüm değişkenler 0 olduğunda beklenen baz maliyettir.
+# age: Kişinin yaşı 1 arttığında, sigorta maliyetinin ortalama ne kadar artacağını gösterir. (pozitif etki, çok yüksek değildir ama vardır)
+# bmi: Vücut kitle indeksindeki 1 birimlik artışın maliyete yansımasıdır. (pozitif etki, çok yüksek değildir ama vardır)
+# children: Çocuk sahibi olup olmamanın ortalama ne kadar artış sağladığını gösterir. (pozitif etkisi bulunmaktadır)
+# sex: Cinsiyetin sigorta maliyetine olan etkisini gösterir (negatif etki vardır ama çok düşüktür.)
+# smokeryes: Sigara içen birinin, içmeyene göre ortalama ne kadar maliyetinin fazla olduğunu gösterir. (pozitif etki vardır. en yüksek etki buradadır.)
+# region: Genel olarak bakıldığında regionın etkisi northwestte çok düşük pozitifken diğerlerinde negatif etki vardır.
+# Pozitif değerler harcamayı artırır, negatif değerler azaltır.
+
+# Std.Error:
+# Bu katsayının ne kadar güvenilir olduğunu test etme ölçüsüdür.
+# Bu değer ne kadar küçükse, hesapladığımız 'Estimate' değeri o kadar kesindir.
+# Regiondaki değerlerin yüksek olması estimate değerinin güvenilir olmadığını gösterir.
+
+# t-value ve Pr(>|t|):
+# Bir değişkenin modelde kalıp kalmadığına karar verdiğimiz değerler bu ikisidir.
+# P-değeri (Pr) 0.05'ten küçük olan değişkenler istatistiksel olarak anlamlıdır. Yani sigorta maliyeti üzerinde gerçek bir etkisi vardır.
+# Yüksek olan değerler ise modelden çıkarılıp model yeniden test edilecektir. 
+
+# Residual standart error:
+# Modelin yaptığı hataların standart sapmasıdır. 
+# Tahminlerin gerçek değerlerden ortalama ne kadar saptığını gösterir.
+# Düşük olması iyidir. Şuanki modelde çok yüksektir.
+
+# Multiple R-squared ve Adjusted R-squared:
+# Bağımsız değişkenin bağımlı değişkendeki değişimin yüzde kaçını açıkladığını gösterir. Bu değer 0 ile 1 arasındadır.
+# Şuandaki değerimize göre model verinin %76'sını açıklar. %24 ise başka sebeplerden kaynaklanır.
+
+# F-statistic:
+# Modelin bir bütün olarak anlamlı olup olmadığını test eder
+# Buradaki p-value < 0.05 ise, model anlamlıdır.
+```
+
+# 8. Varsayım Kontrolleri
+
+```{r diagnostics}
+cat("\n--- VIF Değerleri ---\n")
+vif_values <- vif(model1)
+print(vif_values)
+
+if(any(vif_values > 5)) cat("UYARI: 5'ten büyük VIF değeri var!\n") else cat("Multicollinearity sorunu görünmüyor.\n")
+
+# İlk olarak Multicollinearity sorununu kontrol ediyoruz. 
+# Değişkenlerin birbirini tekrar edip etmediğine bakıyoruz. 
+# Eğer bir değişkenin VIF değeri 5'in üzerindeyse, bu değişken modelde sorun yaratıyor demektir. 
+# Bizim çıktımızda tüm değerler 5'in altında olduğu için, değişkenlerimiz birbirinden bağımsız ve temizdir.
+
+model_log <- lm(log(charges) ~ age + bmi + children + sex + smoker + region, data=trainset)
+
+cat("\n====================\n")
+cat("MODEL (LOG) ÖZET\n")
+cat("====================\n")
+print(summary(model_log))
+#Logaritmik dönüşüm yaptık.Bunun sonucunda Adjusted R-squared değerimiz 0.2 birim artmış oldu.Standart hatalarımızı 
+# da yüksek derecede azalttı.Modelimiz biraz daha iyileşmiş oldu.
+
+residuals <- residuals(model_log)
+cat("\n--- Shapiro-Wilk Normallik Testi ---\n")
+shapiro_res <- shapiro.test(residuals[1:5000]) # Büyük veride örneklem alarak test ettik
+print(shapiro_res)
+
+# Modelin yaptığı hataların (kalıntıların) rastgele ve normal dağılıp dağılmadığını 'Shapiro-Wilk' ile test ediyoruz.
+# H0 : Hatalar normal dağılır.
+# H1 : Hatalar normal dağılmaz.
+# Eğer p-değeri < 0.05 ise hatalar normal dağılmıyor demektir. 
+# Büyük verisetlerinde p-değeri genelde küçük çıkar, bu yüzden Q-Q grafiği ile görsel teyit daha önemlidir.
+
+cat("\n--- Breusch-Pagan Testi ---\n")
+print(bptest(model_log))
+
+# Burada hataların varyansının sabit olup olmadığını ölçüyoruz.
+# Eğer p-değeri < 0.05 ise 'Heteroscedasticity' (değişen varyans) sorunu vardır. 
+# Yani modelimiz verinin bazı bölgelerinde tutarsız davranıyor olabilir.
+
+cat("\n--- Durbin-Watson Testi ---\n")
+print(dwtest(model_log))
+
+# Hataların birbiriyle ilişkili olup olmadığını yani Otokorelasyon test ediyoruz.
+# Çıkan 'DW' değeri 0 ile 4 arasındadır. 
+# Bizim hedefimiz bu değerin 2'ye yakın olmasıdır.
+# 0-1.5 negatif otokorelasyon
+# 1.5-2.5 otokorelasyon yok
+# 2.5-4 pozitif otokorelasyon
+# 2 civarı bir değer, hataların birbirinden bağımsız olduğunu, yani modelin bir önceki hatasının bir sonraki hatayı etkilemediğini gösterir.
+
+
+# Stepwise Regression (AIC)
+# both: hem ekleyip hem çıkarabilir
+model_step <- step(model_log, direction="both", trace=0)
+
+cat("\n====================\n")
+cat("MODEL (STEPWISE - AIC) ÖZET\n")
+cat("====================\n")
+print(summary(model_step))
+
+#Uyguladığımız iki taraflı stepwise regresyon AIC değerini olabildiğince azaltarak modelimizin biraz
+#daha iyileşmesini sağladı.Burada forward ve bacward yerine both kullanılarak gerekli değişkenleri ekleyip çıkararak 
+#AIC'nin opttimal olmasını sağlar.
+#Bu son modelimiz ile artık standart hatamız oldukça düşmüş olup.R-squared değerlerimiz artmıştır.
+
+
+par(mfrow = c(2, 2)) # Ekranı 4'e böl
+plot(model_step)         # 4 temel grafiği çiz
+par(mfrow = c(1, 1)) # Ekranı normale döndür
+
+# Bu kod çalıştığında ekrana 4 grafik gelir.
+# 1. Residuals vs Fitted : Kırmızı çizginin dümdüz yatay olması gerekir. Eğrilik varsa, model verideki lineer olmayan yapıyı kaçırıyor demektir.
+# 2. Normal Q-Q : Noktaların kesikli çizgi üzerinde ip gibi dizilmesi gerekir. Eğer uçlarda sapmalar varsa, hatalar normal dağılmıyordur.
+# 3. Scale-Location: Varyansın sabitliğini gösterir. Noktaların rastgele dağılmasını bekleriz.
+# 4. Residuals vs Leverage: Veri setinde modeli tek başına bozan 'baskın' (outlier) gözlemler olup olmadığını gösterir. Cook's distance çizgisi dışına taşan nokta varsa o veriyi incelemeliyiz.
+```
+
+# 9. Test Seti Performans Değerlendirmesi
+
+```{r evaluation}
+predictions <- predict(model_step, newdata = testset)
+
+# Modelimizin eğitimini tamamladıktan sonra, kenara ayırdığımız ve 
+# modelin daha önce hiç görmediği %20'lik 'Test Seti'ni devreye sokuyoruz.
+
+rmse_val <- sqrt(mean((testset$charges - predictions)^2)) # Hataların karesinin ortalamasının karekökü
+mae_val <- mean(abs(testset$charges - predictions))       # Mutlak hataların ortalaması
+
+# 1. MAE (Ortalama Mutlak Hata): tahminimizin ne kadar saptığını gösterir.
+#    Daha yorumlanabilir bir değerdir.
+# 2. RMSE (Kök Ortalama Kare Hata): RMSE ile MAE arasındaki farka bakarak model değerlendirilir.
+
+r2_val <- summary(lm(predictions ~ testset$charges))$r.squared
+
+# Modelin eğitim setindeki başarısının, test setinde de devam edip etmediğini kontrol ediyoruz.
+# Eğer Train R² yüksek, ama buradaki Test R² çok düşükse overfitting var demektir.
+# Birbirine yakın olması, modelin sağlıklı olduğunu gösterir.
+
+cat("\n--- Test Seti Performansı ---\n")
+cat("RMSE (Risk Odaklı Hata):", round(rmse_val, 2), "\n")
+cat("MAE  (Ortalama Sapma) :", round(mae_val, 2), "\n")
+cat("R²   (Açıklama Gücü)  :", round(r2_val, 4), "\n")
+
+# Gördüğünüz gibi, modelimizin hiç görmediği verilerdeki R-Kare değeri (0.7) 
+# eğitim setiyle tutarlı.
+# MAE değerimize baktığımızda ise modelimiz, bir kişinin sağlık harcamasını tahmin ederken 
+# ortalama 4723.49 birimlik bir yanılma payı ile çalışıyor. 
+# Sigorta sektörü için bu sapma kabul edilebilir sınırlar içindedir.
+```
