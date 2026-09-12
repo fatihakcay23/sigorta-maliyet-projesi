@@ -5,7 +5,7 @@
 > Kısa özet (EN): A Streamlit web app that predicts annual medical insurance charges from a person's age, BMI, smoking status, number of children, sex and region, using a Linear Regression model trained with scikit-learn.
 
 <!-- Canlı demo yayınladıktan sonra bu satırı güncelleyin: -->
-🔗 **Canlı Demo:** _[Streamlit Cloud linkinizi buraya ekleyin]_
+🔗 **Canlı Demo:
 
 <!-- Uygulamanızdan bir ekran görüntüsü alıp docs/screenshot.png olarak ekleyin, sonra alttaki satırın başındaki # işaretini kaldırın -->
 <!-- ![Uygulama Ekran Görüntüsü](docs/screenshot.png) -->
