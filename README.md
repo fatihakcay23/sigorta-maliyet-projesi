@@ -1,4 +1,4 @@
-# 🏥 Sigorta Maliyeti Tahmin Sistemi
+# Sigorta Maliyeti Tahmin Sistemi
 
 **Insurance Cost Prediction App** — Doğrusal regresyon ile bireylerin yıllık sağlık sigortası maliyetini tahmin eden, Streamlit ile geliştirilmiş interaktif bir makine öğrenmesi uygulaması.
 
@@ -12,7 +12,7 @@
 
 ---
 
-## 📌 Proje Hakkında
+##  Proje Hakkında
 
 Bu proje, [Kaggle Medical Cost Personal Dataset](https://www.kaggle.com/datasets/mirichoi0218/insurance) üzerinde bir regresyon analizi yapılarak geliştirilmiştir. Amaç, bir kişinin;
 
@@ -24,15 +24,14 @@ Bu proje, [Kaggle Medical Cost Personal Dataset](https://www.kaggle.com/datasets
 - Yaşadığı bölge
 
 bilgilerine bakarak yıllık sigorta maliyetini (`charges`) tahmin etmektir. Proje; veri ön işleme, keşifsel veri analizi (EDA), model eğitimi/değerlendirmesi ve sonuçların interaktif bir web arayüzü üzerinden sunulması adımlarını kapsar.
+##  Özellikler
 
-## ✨ Özellikler
+-  Kullanıcının kendi bilgilerini girerek anlık tahmin alabildiği interaktif form
+-  Sigara kullanımı ve BMI'nin maliyet üzerindeki etkisini gösteren görselleştirmeler
+-  Ekranda gösterilen model performans metrikleri (R², MAE)
+-  Kategorik değişkenler için one-hot encoding, eğitim/test ayrımı ile doğrulama
 
-- 🎚️ Kullanıcının kendi bilgilerini girerek anlık tahmin alabildiği interaktif form
-- 📊 Sigara kullanımı ve BMI'nin maliyet üzerindeki etkisini gösteren görselleştirmeler
-- 📈 Ekranda gösterilen model performans metrikleri (R², MAE)
-- 🧹 Kategorik değişkenler için one-hot encoding, eğitim/test ayrımı ile doğrulama
-
-## 🛠️ Kullanılan Teknolojiler
+##  Kullanılan Teknolojiler
 
 | Katman | Teknoloji |
 |---|---|
@@ -43,7 +42,7 @@ bilgilerine bakarak yıllık sigorta maliyetini (`charges`) tahmin etmektir. Pro
 | Web arayüzü | Streamlit |
 | Analiz / Ödev dosyaları | Jupyter Notebook, R Markdown |
 
-## 📂 Proje Yapısı
+##  Proje Yapısı
 
 ```
 sigorta-maliyet-projesi/
@@ -55,7 +54,7 @@ sigorta-maliyet-projesi/
 └── README.md
 ```
 
-## 🚀 Kurulum ve Çalıştırma
+##  Kurulum ve Çalıştırma
 
 ```bash
 # 1. Depoyu klonlayın
@@ -75,7 +74,7 @@ streamlit run app.py
 
 Uygulama varsayılan olarak `http://localhost:8501` adresinde açılır.
 
-## 📊 Model Performansı
+##  Model Performansı
 
 Model, verinin %80'i ile eğitilip %20'lik test seti üzerinde değerlendirilmiştir:
 
@@ -86,18 +85,17 @@ Model, verinin %80'i ile eğitilip %20'lik test seti üzerinde değerlendirilmi�
 
 > Not: En büyük etkiyi sigara kullanımı değişkeni yaratmaktadır; sigara içenlerde tahmini maliyet belirgin şekilde artmaktadır.
 
-## 🔮 Geliştirme Fikirleri
+##  Geliştirme Fikirleri
 
 - [ ] Doğrusal regresyona ek olarak Random Forest / Gradient Boosting gibi modellerle karşılaştırma
 - [ ] Model performansını iyileştirmek için özellik mühendisliği (ör. yaş × sigara etkileşimi)
 - [ ] Streamlit Community Cloud üzerinde canlı yayına alma
 - [ ] Birim testleri ekleme
-
-## 👤 Geliştirici
+##  Geliştirici
 
 **Fatih Akçay**
 [GitHub](https://github.com/fatihakcay23)
 
-## 📄 Lisans
+## Lisans
 
 Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır.
